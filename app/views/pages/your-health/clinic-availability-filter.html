@@ -5,73 +5,131 @@
 {% set backLink = true %}
 {% set backLinkURL = backUrl %}
 
-{% set pageHeading = "Filter: Time & day" %}
+{% set pageHeading = "Choose your preferred days" %}
 
 {% block content %}
 
   <style>
-    .filter-section-label { display:block; font-size:18px; font-weight:700; color:#212b32; margin-bottom:0; }
-    .filter-check-list { list-style:none; padding:0; margin:0 0 28px; border-top:1px solid #d8dde0; }
-    .filter-check-label { display:flex; align-items:center; gap:16px; font-size:18px; color:#212b32; padding:14px 0; cursor:pointer; border-bottom:1px solid #d8dde0; }
-    .filter-checkbox { width:40px; height:40px; border:2px solid #4c6272; border-radius:4px; flex:0 0 40px; appearance:none; -webkit-appearance:none; cursor:pointer; background:#fff; position:relative; margin:0; }
-    .filter-checkbox:checked { background:#005eb8; border-color:#005eb8; }
-    .filter-checkbox:checked::after { content:''; position:absolute; left:11px; top:4px; width:10px; height:18px; border:3px solid #fff; border-top:none; border-left:none; transform:rotate(45deg); }
-    .filter-apply-btn { display:block; width:100%; background:#007f3b; color:#fff; border:none; padding:16px; font-size:18px; font-weight:700; cursor:pointer; font-family:inherit; margin-top:8px; }
-    .filter-apply-btn:hover { background:#005e2b; }
-    .filter-checkbox:focus-visible { outline: 3px solid #ffb81c; outline-offset: 3px; }
+    .filter-or { margin:8px 0 16px; }
   </style>
 
   <div class="nhsuk-grid-row">
     <div class="nhsuk-grid-column-full">
 
-      <h1 class="nhsuk-heading-l">Filter appointment availability by:</h1>
+      {% if dateError %}
+        <div class="nhsuk-error-summary" aria-labelledby="error-summary-title" role="alert" tabindex="-1">
+          <h2 class="nhsuk-error-summary__title" id="error-summary-title">There is a problem</h2>
+          <div class="nhsuk-error-summary__body">
+            <ul class="nhsuk-list nhsuk-error-summary__list">
+              <li><a href="#filter-date-{{ dateError.fields[0] }}">{{ dateError.message }}</a></li>
+            </ul>
+          </div>
+        </div>
+      {% endif %}
+
+      <h1 class="nhsuk-heading-l">Choose your preferred days</h1>
 
       <form method="post">
         <input type="hidden" name="clinic" value="{{ clinic }}">
         <input type="hidden" name="postcode" value="{{ postcode }}">
         <input type="hidden" name="returnTo" value="{{ returnTo }}">
+        <input type="hidden" name="view" value="{{ view }}">
 
-        <fieldset class="nhsuk-fieldset" style="border: none; padding: 0; margin: 0;">
-          <legend class="nhsuk-fieldset__legend filter-section-label">Times</legend>
-          <ul class="filter-check-list">
-            {% set timeOptions = [
-              { value: 'before9',         label: 'Before 9am' },
-              { value: 'morning',         label: '9am to 11:59am' },
-              { value: 'early-afternoon', label: 'midday to 1:59pm' },
-              { value: 'late-afternoon',  label: '2pm to 4:59pm' },
-              { value: 'evening',         label: '5pm and later' }
-            ] %}
-            {% for opt in timeOptions %}
-              <li>
-                <label class="filter-check-label">
-                  <input type="checkbox" class="filter-checkbox" name="filter-times" value="{{ opt.value }}"{% if opt.value in filterTimes %} checked{% endif %}>
-                  {{ opt.label }}
-                </label>
-              </li>
-            {% endfor %}
-          </ul>
-        </fieldset>
+        <div class="nhsuk-form-group">
+          <fieldset class="nhsuk-fieldset">
+            <legend class="nhsuk-u-visually-hidden">Preferred days</legend>
+            <div class="nhsuk-checkboxes">
+              {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+              {% for day in days %}
+                <div class="nhsuk-checkboxes__item">
+                  <input class="nhsuk-checkboxes__input" id="day-{{ loop.index }}" name="filter-days" type="checkbox" value="{{ day }}"{% if day in filterDays %} checked{% endif %}>
+                  <label class="nhsuk-label nhsuk-checkboxes__label" for="day-{{ loop.index }}">{{ day }}</label>
+                </div>
+              {% endfor %}
+            </div>
+          </fieldset>
+        </div>
 
-        <fieldset class="nhsuk-fieldset" style="border: none; padding: 0; margin: 0;">
-          <legend class="nhsuk-fieldset__legend filter-section-label">Days</legend>
-          <ul class="filter-check-list">
-            {% set days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
-            {% for day in days %}
-              <li>
-                <label class="filter-check-label">
-                  <input type="checkbox" class="filter-checkbox" name="filter-days" value="{{ day }}"{% if day in filterDays %} checked{% endif %}>
-                  {{ day }}
-                </label>
-              </li>
-            {% endfor %}
-          </ul>
-        </fieldset>
+        <p class="nhsuk-body filter-or">or</p>
 
-        <button type="submit" class="filter-apply-btn">Apply filters</button>
-        <div style="height: 40px;"></div>
+        <div class="nhsuk-form-group">
+          <div class="nhsuk-checkboxes">
+            <div class="nhsuk-checkboxes__item">
+              <input class="nhsuk-checkboxes__input" id="filter-date-toggle" name="filter-date-toggle" type="checkbox" value="yes"{% if filterDate or dateChecked %} checked{% endif %} aria-controls="filter-date-panel" aria-expanded="{{ 'true' if (filterDate or dateChecked) else 'false' }}">
+              <label class="nhsuk-label nhsuk-checkboxes__label" for="filter-date-toggle">Select your preferred date</label>
+            </div>
+            <div class="nhsuk-checkboxes__conditional{% if not (filterDate or dateChecked) %} nhsuk-checkboxes__conditional--hidden{% endif %}" id="filter-date-panel">
+              {% set dateParts = dateParts if dateParts else (filterDate.split('/') if filterDate else ['', '', '']) %}
+              <div class="nhsuk-form-group{% if dateError %} nhsuk-form-group--error{% endif %}">
+                <div class="nhsuk-hint" id="filter-date-hint">For example, 01 01 2026</div>
+                {% if dateError %}
+                  <p class="nhsuk-error-message" id="filter-date-error"><span class="nhsuk-u-visually-hidden">Error:</span> {{ dateError.message }}</p>
+                {% endif %}
+                <div class="nhsuk-date-input" id="filter-date" aria-describedby="filter-date-hint">
+                  <div class="nhsuk-date-input__item">
+                    <div class="nhsuk-form-group">
+                      <label class="nhsuk-label nhsuk-date-input__label" for="filter-date-day">Day</label>
+                      <input class="nhsuk-input nhsuk-date-input__input nhsuk-input--width-2{% if dateError and 'day' in dateError.fields %} nhsuk-input--error{% endif %}" id="filter-date-day" name="filter-date-day" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" value="{{ dateParts[0] }}">
+                    </div>
+                  </div>
+                  <div class="nhsuk-date-input__item">
+                    <div class="nhsuk-form-group">
+                      <label class="nhsuk-label nhsuk-date-input__label" for="filter-date-month">Month</label>
+                      <input class="nhsuk-input nhsuk-date-input__input nhsuk-input--width-2{% if dateError and 'month' in dateError.fields %} nhsuk-input--error{% endif %}" id="filter-date-month" name="filter-date-month" type="text" inputmode="numeric" maxlength="2" pattern="[0-9]*" value="{{ dateParts[1] }}">
+                    </div>
+                  </div>
+                  <div class="nhsuk-date-input__item">
+                    <div class="nhsuk-form-group">
+                      <label class="nhsuk-label nhsuk-date-input__label" for="filter-date-year">Year</label>
+                      <input class="nhsuk-input nhsuk-date-input__input nhsuk-input--width-4{% if dateError and 'year' in dateError.fields %} nhsuk-input--error{% endif %}" id="filter-date-year" name="filter-date-year" type="text" inputmode="numeric" maxlength="4" pattern="[0-9]*" value="{{ dateParts[2] }}">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="nhsuk-button" style="background:#007f3b; box-shadow:0 4px 0 #003d20; width:100%">Apply filters</button>
       </form>
 
     </div>
   </div>
+
+  <script>
+    (function () {
+      var toggle = document.getElementById('filter-date-toggle');
+      var panel = document.getElementById('filter-date-panel');
+
+      function sync() {
+        panel.classList.toggle('nhsuk-checkboxes__conditional--hidden', !toggle.checked);
+        toggle.setAttribute('aria-expanded', toggle.checked ? 'true' : 'false');
+      }
+      var dayBoxes = Array.prototype.slice.call(document.querySelectorAll('input[name="filter-days"]'));
+      function uncheckDays() { dayBoxes.forEach(function (b) { b.checked = false; }); }
+
+      // Days and a specific date are alternatives ("or")
+      toggle.addEventListener('change', function () {
+        if (toggle.checked) uncheckDays();
+        sync();
+      });
+      dayBoxes.forEach(function (b) {
+        b.addEventListener('change', function () {
+          if (b.checked) { toggle.checked = false; sync(); }
+        });
+      });
+      sync();
+
+      // Digits only; move to the next box once Day / Month have 2 digits
+      var parts = ['day', 'month', 'year'].map(function (n) { return document.getElementById('filter-date-' + n); });
+      parts.forEach(function (input, i) {
+        input.addEventListener('input', function () {
+          input.value = input.value.replace(/\D/g, '').slice(0, input.maxLength);
+          if (input.value) uncheckDays();
+          if (i < 2 && input.value.length === 2) parts[i + 1].focus();
+        });
+      });
+    })();
+  </script>
 
 {% endblock %}
