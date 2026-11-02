@@ -285,11 +285,11 @@ router.get('/pages/your-health/view-availability-results', (req, res) => {
 	const key = resolvePostcodeKey(postcode);
 	const clinicIds = postcodeMap[key] || postcodeMap['DEFAULT'] || [];
 	const clinicsList = loadClinicsList();
-	// Filters only apply on the Day tab (other tabs show all clinics). They are
-	// kept in the session so they stay until the user removes them.
-	const view = ['earliest', 'day'].includes(req.query.view) ? req.query.view : 'closest';
+	// Day and time filters are kept in the session so they stay until the user
+	// removes them, whichever sort order is showing.
+	const view = req.query.view === 'earliest' ? 'earliest' : 'closest';
 	if (req.query.clearFilters) delete req.session.dayFilters;
-	const dayFilters = view === 'day' ? getDayFilters(req) : { days: [], times: [], date: '' };
+	const dayFilters = getDayFilters(req);
 	const filterDays = dayFilters.days;
 	const filterTimes = dayFilters.times;
 	const filterDate = dayFilters.date;
@@ -300,7 +300,7 @@ router.get('/pages/your-health/view-availability-results', (req, res) => {
 		const fullDays = availability.generateFullAvailability(key, id, c.openingHours, 56, clinicIndex);
 		const times = filteredSlotsFromFull(fullDays, filterDays, filterTimes, filterDate);
 		const clinicUrl = buildUrl('/pages/your-health/clinic-availability', {
-			clinic: id, postcode, view: view === 'closest' ? '' : view
+			clinic: id, postcode, view: view === 'closest' ? '' : view, show: filterCount ? 'chosen' : ''
 		});
 		const firstDay = times.length ? fullDays.find(d => d.dateLabel === times[0].dateLabel) : null;
 		const firstDaySlots = firstDay ? slotCountForDay(firstDay, filterTimes) : 0;
@@ -315,7 +315,7 @@ router.get('/pages/your-health/view-availability-results', (req, res) => {
 		return Object.assign({}, c, { times, clinicUrl, firstDaySlots, earliestKey });
 	}).filter(c => filterCount === 0 || c.times.length > 0);
 
-	// Tabs: closest (default, current order), earliest time, day
+	// Sort options: closest clinic (default, current order) or soonest date
 	if (view === 'earliest') {
 		clinics.sort((a, b) => a.earliestKey - b.earliestKey);
 	}
@@ -323,20 +323,24 @@ router.get('/pages/your-health/view-availability-results', (req, res) => {
 		postcode, view: v === 'closest' ? '' : v
 	});
 	const tabs = [
-		{ id: 'closest', label: 'Closest' },
-		{ id: 'earliest', label: 'Earliest' },
-		{ id: 'day', label: 'Specific day' }
+		{ id: 'closest', label: 'Closest clinic' },
+		{ id: 'earliest', label: 'Soonest date' }
 	].map(t => Object.assign(t, { url: tabUrl(t.id), active: t.id === view }));
 
 	res.render('pages/your-health/view-availability-results', {
 		postcode,
 		clinics,
 		view,
-		specificDay: view === 'day' ? specificDayForm(req, dayFilters) : null,
 		viewTabs: tabs,
 		clinicsJson: JSON.stringify(clinics, null, 2),
 		debug: req.query.debug || '',
-		filterCount
+		filterCount,
+		filterPageUrl: buildUrl('/pages/your-health/clinic-availability-filter', {
+			postcode, returnTo: 'results', view: view === 'closest' ? '' : view
+		}),
+		clearFiltersUrl: buildUrl('/pages/your-health/view-availability-results', {
+			postcode, view: view === 'closest' ? '' : view, clearFilters: 1
+		})
 	});
 });
 
@@ -350,7 +354,7 @@ router.post('/pages/your-health/specific-day', (req, res) => {
 	const days = [].concat(req.body['filter-days'] || []).filter(v => v !== '_unchecked');
 	const back = () => returnTo === 'clinic'
 		? buildUrl('/pages/your-health/clinic-availability', { clinic: clinicId, postcode, view, show: 'chosen' })
-		: buildUrl('/pages/your-health/view-availability-results', { postcode, view: 'day' });
+		: buildUrl('/pages/your-health/view-availability-results', { postcode });
 
 	let iso = '';
 	let dayVal = '', monthVal = '';
@@ -378,9 +382,7 @@ router.post('/pages/your-health/specific-day', (req, res) => {
 router.get('/pages/your-health/clinic-availability-filter', (req, res) => {
 	const clinicId = req.query.clinic || '';
 	const postcode = req.query.postcode || '';
-	const filterDays = [].concat(req.query['filter-days'] || []).filter(v => v !== '_unchecked');
-	const filterTimes = [].concat(req.query['filter-times'] || []).filter(v => v !== '_unchecked');
-	const filterDate = req.query['filter-date'] || '';
+	const { days: filterDays, times: filterTimes, date: filterDate } = getDayFilters(req);
 	const returnTo = req.query.returnTo || '';
 	res.render('pages/your-health/clinic-availability-filter', {
 		clinic: clinicId, postcode, filterDays, filterTimes, filterDate,
@@ -392,7 +394,7 @@ router.get('/pages/your-health/clinic-availability-filter', (req, res) => {
 function filterBackUrl(returnTo, clinicId, postcode, view, filterDays, filterTimes) {
 	return returnTo === 'clinic'
 		? buildUrl('/pages/your-health/clinic-availability', { clinic: clinicId, postcode, view, show: 'chosen' })
-		: buildUrl('/pages/your-health/view-availability-results', { postcode, 'filter-days': filterDays, 'filter-times': filterTimes, view: returnTo === 'results-day' ? 'day' : '' });
+		: buildUrl('/pages/your-health/view-availability-results', { postcode, view: view === 'earliest' ? view : '' });
 }
 
 router.post('/pages/your-health/clinic-availability-filter', (req, res) => {
@@ -417,7 +419,7 @@ router.post('/pages/your-health/clinic-availability-filter', (req, res) => {
 		filterDate = parseFilterDate(dateParts.join('/'));
 	}
 	// Day-tab filters are shared between the results page and clinic page
-	if (returnTo === 'clinic' || returnTo === 'results-day') {
+	if (returnTo === 'clinic' || returnTo === 'results') {
 		if (filterDate) {
 			req.session.dayFilters = { days: [], times: [], date: filterDate };
 		} else if (filterDays.length || filterTimes.length) {
@@ -430,8 +432,10 @@ router.post('/pages/your-health/clinic-availability-filter', (req, res) => {
 		res.redirect(buildUrl('/pages/your-health/clinic-availability', {
 			clinic: clinicId, postcode, view: req.body.view, show: 'chosen'
 		}));
-	} else if (returnTo === 'results-day') {
-		res.redirect(buildUrl('/pages/your-health/view-availability-results', { postcode, view: 'day' }));
+	} else if (returnTo === 'results') {
+		res.redirect(buildUrl('/pages/your-health/view-availability-results', {
+			postcode, view: req.body.view === 'earliest' ? 'earliest' : ''
+		}));
 	} else {
 		res.redirect(buildUrl('/pages/your-health/view-availability-results', {
 			postcode, 'filter-days': filterDays, 'filter-times': filterTimes
