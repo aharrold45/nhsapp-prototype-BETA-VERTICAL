@@ -21,20 +21,20 @@
     .clinic-availability .ca-cqc-dot--outstanding { background:#330072; }
     .clinic-availability .ca-cqc-dot--inadequate { background:#d5281b; }
 
-    .view-tabs { display:flex; gap: 24px; margin:0; }
-    .tab-panel { background:#fff; margin:0 -16px 24px; padding:24px 16px; }
-    .view-tabs__tab { padding: 12px 12px; background:#d8dde0; color:#212b32; font-size:1rem; text-decoration:underline; }
-    .view-tabs__tab[aria-current="true"] { background:#fff; text-decoration:none; }
+    .sort-by { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px 24px; margin:0 0 24px; }
+    .sort-by__label { color:#212b32; font-size:1rem; }
+    .sort-by__option { color:#005eb8; font-size:1rem; text-decoration:underline; }
+    .sort-by__option[aria-current="true"] { color:#212b32; font-weight:700; text-decoration:none; }
+    .more-times-link { display:inline-block; margin:-8px 0 20px; font-size:16px; color:#005eb8; background:none; border:0; padding:0; font-family:inherit; text-decoration:underline; cursor:pointer; }
     .day-filter-row { display:flex; align-items:center; justify-content:space-between; margin:0 0 16px; }
     .day-filter-link { display:inline-flex; align-items:center; gap:10px; padding:8px 0; color:#005eb8; font-size:16px; }
     .day-filter-clear { color:#005eb8; font-size:16px; }
 
     .load-more-btn { display:block; width:100%; background:#fff; border:2px solid #005eb8; color:#005eb8; padding:14px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; margin:24px 0 8px; text-align:center; }
 
-    .filter-row { display:flex; align-items:center; justify-content:space-between; background:#f0f4f5; margin:0 -16px 8px; padding:0 16px; }
-    .filter-row:hover { background:#e8edee; }
+    .filter-row { display:flex; align-items:center; justify-content:space-between; margin:0 0 8px; }
     .filter-bar { display:flex; align-items:center; gap:10px; background:none; border:none; padding:14px 0; color:#005eb8; font-size:16px; font-weight:700; cursor:pointer; text-align:left; font-family:inherit; }
-    .clear-filters-btn { display:none; background:none; border:none; color:#005eb8; font-size:16px; cursor:pointer; text-decoration:underline; padding:14px 0; font-family:inherit; white-space:nowrap; }
+    .clear-filters-btn { display:inline-block; text-decoration:underline; background:none; border:none; color:#005eb8; font-size:16px; cursor:pointer; text-decoration:underline; padding:14px 0; font-family:inherit; white-space:nowrap; }
 
     .day-heading { font-size:16px; font-weight:normal; margin:20px 0 8px; color:#212b32; }
     .day-section:first-child .day-heading { margin-top:0; }
@@ -81,26 +81,32 @@
     {% else %}
 
       <p class="nhsuk-body" style="margin-bottom:16px">{{ clinic.durationDesc }}</p>
-      <h2 class="nhsuk-heading-m">View times by</h2>
-      <nav class="view-tabs" aria-label="View availability by">
+      <div class="filter-row">
+        <a class="filter-bar nhsuk-link" href="{{ filterPageUrl }}" aria-label="Filter by day and time">
+          <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="0" y1="1" x2="18" y2="1" stroke="currentColor" stroke-width="2"/>
+            <line x1="3" y1="7" x2="15" y2="7" stroke="currentColor" stroke-width="2"/>
+            <line x1="6" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Filter: Day and time{% if filterCount > 0 %} ({{ filterCount }}){% endif %}
+        </a>
+        {% if filterCount > 0 %}
+          <a class="clear-filters-btn" href="{{ clearFiltersUrl }}">Clear filters</a>
+        {% endif %}
+      </div>
+
+      <nav class="sort-by" aria-label="View times">
+        <span class="sort-by__label">View:</span>
         {% for t in availabilityTabs %}
-          <a class="view-tabs__tab" href="{{ t.url }}"{% if t.active %} aria-current="true"{% endif %}>{{ t.label }}</a>
+          <a class="sort-by__option view-tabs__tab" href="{{ t.url }}"{% if t.active %} aria-current="true"{% endif %}>{{ t.label }}</a>
         {% endfor %}
       </nav>
 
-      <div class="tab-panel">
-
-      {% if tab == 'chosen' %}
-        {% set sdReturnTo = 'clinic' %}
-        {% include 'pages/your-health/specific-day-form.html' %}
-      {% endif %}
-
       <div id="sd-results"><div id="days-container"></div></div>
-      </div>
 
     {% endif %}
 
-    <h2 class="nhsuk-heading-m">Can't see a time suitable?</h2>
+    <h2 class="nhsuk-heading-m" style="margin-top:40px;">Can't see a time suitable?</h2>
     <ul class="nhsapp-cards">
       <li class="nhsapp-card">
         <div class="nhsapp-card__container">
@@ -184,7 +190,7 @@
         var s = (timeStr || '').trim().toLowerCase();
         if (s === 'midnight') return 0;
         if (s === 'midday') return 12;
-        var m = s.match(/(\d+)(?::(\d+))?\s*(am|pm)/i);
+        var m = s.match(/(\d+)(?:[:.](\d+))?\s*(am|pm)/i);
         if (!m) return 0;
         var h = parseInt(m[1]);
         var p = m[3].toLowerCase();
@@ -215,22 +221,31 @@
           '&time=' + encodeURIComponent(slot.start);
       }
 
+      var ROW = 3;
+      var expandedDays = {};
+
+      function slotLinks(slots, dayData) {
+        return slots.map(function (sl) {
+          return '<a class="slot-btn" href="' + slotHref(dayData, sl) + '"><span class="nhsuk-u-visually-hidden">' + dayData.dateLabel + ' </span>' + sl.start + '</a>';
+        }).join('');
+      }
+
+      // Earliest times: first row only, with a "Show n more" link when there are more.
+      // All times: every slot.
       function renderPeriod(label, slots, dayData) {
-        var html = '<p class="period-label">' + label + '</p>';
         if (!slots || !slots.length) {
-          html += '<p class="ca-none-available" style="color:#4c6272; font-size:14px; margin:0 0 16px">None available</p>';
-        } else {
-          html += '<div class="slots-grid">';
-          for (var i = 0; i < slots.length; i++) {
-            html += '<a class="slot-btn" href="' + slotHref(dayData, slots[i]) + '"><span class="nhsuk-u-visually-hidden">' + dayData.dateLabel + ' </span>' + slots[i].start + '</a>';
-          }
-          html += '</div>';
+          return '<p class="ca-none-available" style="color:#4c6272; font-size:14px; margin:0 0 16px">None available</p>';
+        }
+        var limited = activeFilters.earliestOnly && !expandedDays[dayData.iso] && slots.length > ROW;
+        var html = '<div class="slots-grid">' + slotLinks(limited ? slots.slice(0, ROW) : slots, dayData) + '</div>';
+        if (limited) {
+          var more = slots.length - ROW;
+          html += '<button type="button" class="more-times-link" data-iso="' + dayData.iso + '">Show ' + more + ' more ' + (more === 1 ? 'time' : 'times') + '</button>';
         }
         return html;
       }
 
       function render() {
-        if (activeFilters.hideList) { document.getElementById('days-container').innerHTML = ''; return; }
         var filteredDays = allDays.filter(function(day) {
           if (activeFilters.date && day.data.iso !== activeFilters.date) return false;
           if (activeFilters.days.length && activeFilters.days.indexOf(day.dayName) === -1) return false;
@@ -272,6 +287,13 @@
           if (target) { target.setAttribute('tabindex', '-1'); target.focus(); }
           loadMoreClicked = false;
         }
+
+        document.querySelectorAll('.more-times-link').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            expandedDays[btn.getAttribute('data-iso')] = true;
+            render();
+          });
+        });
 
         var loadMoreBtn = document.getElementById('load-more-btn');
         if (loadMoreBtn) {
