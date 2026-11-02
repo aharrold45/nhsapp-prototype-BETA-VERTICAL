@@ -5,7 +5,7 @@
 {% set backLink = true %}
 {% set backLinkURL = backUrl %}
 
-{% set pageHeading = clinic.name %}
+{% set pageHeading = "Choose a time" %}
 
 {% block content %}
 
@@ -13,6 +13,7 @@
     .clinic-availability { --ca-blue:#005eb8; --ca-green:#007f3b; }
     .clinic-availability .ca-section-break { border:0; border-top:1px solid #d8dde0; margin:20px 0; }
     .clinic-availability .ca-meta-label { font-weight:700; margin:0 0 4px 0; }
+    .clinic-availability .ca-clinic-name { font-size:16px; font-weight:700; margin:0 0 4px 0; }
     .clinic-availability .ca-address { margin:0 0 8px 0; }
     .clinic-availability .ca-cqc-rating { display:flex; align-items:center; gap:10px; margin:8px 0; }
     .clinic-availability .ca-cqc-dot { width:18px; height:18px; border-radius:50%; flex:0 0 auto; }
@@ -21,11 +22,11 @@
     .clinic-availability .ca-cqc-dot--outstanding { background:#330072; }
     .clinic-availability .ca-cqc-dot--inadequate { background:#d5281b; }
 
-    .sort-by { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px 24px; margin:0 0 24px; }
+    .sort-by { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px 24px; margin:0 0 24px; padding-bottom:16px; border-bottom:1px solid #d8dde0; }
     .sort-by__label { color:#212b32; font-size:1rem; }
     .sort-by__option { color:#005eb8; font-size:1rem; text-decoration:underline; }
     .sort-by__option[aria-current="true"] { color:#212b32; font-weight:700; text-decoration:none; }
-    .more-times-link { display:inline-block; margin:-8px 0 20px; font-size:16px; color:#005eb8; background:none; border:0; padding:0; font-family:inherit; text-decoration:underline; cursor:pointer; }
+    .more-times-link { display:inline-block; margin:12px 0 0; font-size:16px; color:#005eb8; background:none; border:0; padding:0; font-family:inherit; text-decoration:underline; cursor:pointer; }
     .day-filter-row { display:flex; align-items:center; justify-content:space-between; margin:0 0 16px; }
     .day-filter-link { display:inline-flex; align-items:center; gap:10px; padding:8px 0; color:#005eb8; font-size:16px; }
     .day-filter-clear { color:#005eb8; font-size:16px; }
@@ -36,14 +37,13 @@
     .filter-bar { display:flex; align-items:center; gap:10px; background:none; border:none; padding:14px 0; color:#005eb8; font-size:16px; font-weight:700; cursor:pointer; text-align:left; font-family:inherit; }
     .clear-filters-btn { display:inline-block; text-decoration:underline; background:none; border:none; color:#005eb8; font-size:16px; cursor:pointer; text-decoration:underline; padding:14px 0; font-family:inherit; white-space:nowrap; }
 
-    .day-heading { font-size:16px; font-weight:normal; margin:20px 0 8px; color:#212b32; }
-    .day-section:first-child .day-heading { margin-top:0; }
-    .period-label { display:none; }
+    .day-heading { font-size:16px; font-weight:700; margin:0 0 12px; color:#212b32; }
+    .day-section + .day-section { margin-top:40px; }
+        .period-label { display:none; }
     .ca-none-available { display:none; }
-    .slots-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:24px; margin-bottom:24px; }
+    .slots-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:24px; margin-bottom:0; }
     .slot-btn { display:flex; align-items:center; justify-content:center; text-align:center; text-decoration:none; background:#fff; border:2px solid #0b5a3b; color:#0b5a3b; min-height:42px; padding:0 4px; border-radius:4px; font-weight:700; font-size:14px; }
     .slot-btn:hover { background:#f0fff4; }
-    .day-divider { border:none; border-top:1px solid #d8dde0; margin:0; }
     .no-days-msg { color:#4c6272; text-align:center; padding:40px 0; font-style:italic; }
     .ca-slot-button { display:block; text-align:center; text-decoration:none; background:#fff; border:2px solid #0b5a3b; color:#0b5a3b; padding:12px 18px; border-radius:8px; font-weight:700; font-size:16px; }
     .ca-walk-in-select { display:inline-block; margin-top:16px; }
@@ -52,20 +52,16 @@
 
   <div class="clinic-availability">
 
-    <h1 class="nhsapp-page-heading nhsuk-heading-l" style="font-weight:normal;">{{ clinic.name }}</h1>
+    <h1 class="nhsapp-page-heading nhsuk-heading-l">Choose a time</h1>
+    <p class="ca-clinic-name">{{ clinic.name }}</p>
 
     {% if clinic.distance %}
-      <p class="ca-meta-label">Location {{ clinic.distance }}</p>
+      <p class="ca-meta-label" style="font-weight:400;">Location {{ clinic.distance }}</p>
     {% endif %}
     {% if clinic.address %}
       <p class="ca-address nhsuk-body">{{ clinic.address }}</p>
     {% endif %}
     <p style="margin-bottom:16px;"><a class="nhsuk-link" href="#" style="font-size:16px;">Get directions</a></p>
-
-    <hr class="ca-section-break" />
-
-    <p class="ca-meta-label">Opening hours</p>
-    <p class="nhsuk-body">{{ clinic.openingHours }}</p>
 
     <hr class="ca-section-break" />
 
@@ -80,7 +76,7 @@
 
     {% else %}
 
-      <p class="nhsuk-body" style="margin-bottom:16px">{{ clinic.durationDesc }}</p>
+      <p class="nhsuk-body" style="margin-bottom:6px">{{ clinic.durationDesc }}</p>
       <div class="filter-row">
         <a class="filter-bar nhsuk-link" href="{{ filterPageUrl }}" aria-label="Filter by day and time">
           <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -96,7 +92,7 @@
       </div>
 
       <nav class="sort-by" aria-label="View times">
-        <span class="sort-by__label">View:</span>
+        <span class="sort-by__label">Showing:</span>
         {% for t in availabilityTabs %}
           <a class="sort-by__option view-tabs__tab" href="{{ t.url }}"{% if t.active %} aria-current="true"{% endif %}>{{ t.label }}</a>
         {% endfor %}
@@ -117,8 +113,6 @@
         </div>
       </li>
     </ul>
-
-    <hr class="nhsuk-section-break nhsuk-section-break--visible nhsuk-section-break--l">
 
     <h2 class="nhsuk-heading-m">Booking over the phone</h2>
       <p>The easiest way to book and manage a test is through this app. If you would prefer to speak to someone you can call 0800 123 456 (9am to 5pm Monday to Friday)</p>
@@ -262,7 +256,6 @@
         } else {
           for (var i = 0; i < visible.length; i++) {
             var day = visible[i];
-            var isLast = i === visible.length - 1;
             var morning = filterSlots(day.data.morning);
             var afternoon = filterSlots(day.data.afternoon);
             var evening = filterSlots(day.data.evening);
@@ -271,7 +264,6 @@
             if (!activeFilters.date) html += '<h2 class="day-heading">' + day.heading + '</h2>';
             // One continuous grid per day (rows of 3), not one per period
             html += renderPeriod('', morning.concat(afternoon, evening), day.data);
-            if (!isLast) html += '<hr class="day-divider">';
             html += '</div>';
           }
         }
