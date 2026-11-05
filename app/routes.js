@@ -467,7 +467,9 @@ router.get('/pages/your-health/clinic-availability', (req, res) => {
 		clinic: clinicId, postcode, view, show: showParam, clearFilters: 1
 	});
 
-	res.render('pages/your-health/clinic-availability', {
+	// New 3-day column layout is the default; ?layout=classic shows the previous list layout
+	const template = req.query.layout === 'classic' ? 'clinic-availability' : 'clinic-availability-columns';
+	res.render('pages/your-health/' + template, {
 		clinic,
 		days,
 		daysJson: JSON.stringify(days),

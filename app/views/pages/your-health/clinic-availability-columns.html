@@ -1,0 +1,408 @@
+{% extends 'layout-app.html' %}
+
+{% set hub = "Your health" %}
+
+{% set backLink = true %}
+{% set backLinkURL = backUrl %}
+
+{% set pageHeading = "Choose a time" %}
+
+{% block content %}
+
+  <style>
+    .clinic-availability { --ca-blue:#005eb8; --ca-green:#007f3b; }
+    .clinic-availability .ca-section-break { border:0; border-top:1px solid #d8dde0; margin:20px 0; }
+    .clinic-availability .ca-meta-label { font-weight:700; margin:0 0 4px 0; }
+    .clinic-availability .ca-clinic-name { font-size:16px; font-weight:700; margin:0 0 4px 0; }
+    .clinic-availability .ca-address { margin:0 0 8px 0; }
+    .clinic-availability .ca-cqc-rating { display:flex; align-items:center; gap:10px; margin:8px 0; }
+    .clinic-availability .ca-cqc-dot { width:18px; height:18px; border-radius:50%; flex:0 0 auto; }
+    .clinic-availability .ca-cqc-dot--good { background:#007f3b; }
+    .clinic-availability .ca-cqc-dot--improve { background:#ffb81c; }
+    .clinic-availability .ca-cqc-dot--outstanding { background:#330072; }
+    .clinic-availability .ca-cqc-dot--inadequate { background:#d5281b; }
+
+    .sort-by { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px 24px; margin:0 0 24px; padding-bottom:16px; border-bottom:1px solid #d8dde0; }
+    .sort-by__label { color:#212b32; font-size:1rem; }
+    .sort-by__option { color:#005eb8; font-size:1rem; text-decoration:underline; }
+    .sort-by__option[aria-current="true"] { color:#212b32; font-weight:700; text-decoration:none; }
+    .more-times-link { display:inline-block; margin:12px 0 0; font-size:16px; color:#005eb8; background:none; border:0; padding:0; font-family:inherit; text-decoration:underline; cursor:pointer; }
+    .day-filter-row { display:flex; align-items:center; justify-content:space-between; margin:0 0 16px; }
+    .day-filter-link { display:inline-flex; align-items:center; gap:10px; padding:8px 0; color:#005eb8; font-size:16px; }
+    .day-filter-clear { color:#005eb8; font-size:16px; }
+
+    .load-more-btn { display:block; width:100%; background:#fff; border:2px solid #005eb8; color:#005eb8; padding:14px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; margin:24px 0 8px; text-align:center; }
+
+    .filter-row { display:flex; align-items:center; justify-content:space-between; margin:0 0 8px; }
+    .filter-bar { display:flex; align-items:center; gap:10px; background:none; border:none; padding:14px 0; color:#005eb8; font-size:16px; font-weight:700; cursor:pointer; text-align:left; font-family:inherit; }
+    .clear-filters-btn { display:inline-block; text-decoration:underline; background:none; border:none; color:#005eb8; font-size:16px; cursor:pointer; text-decoration:underline; padding:14px 0; font-family:inherit; white-space:nowrap; }
+
+    .day-heading { font-size:16px; font-weight:700; margin:0 0 12px; color:#212b32; }
+    .day-section + .day-section { margin-top:40px; }
+        .period-label { display:none; }
+    .ca-none-available { display:none; }
+    .slots-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:24px; margin-bottom:0; }
+    .slot-btn { display:flex; align-items:center; justify-content:center; text-align:center; text-decoration:none; background:transparent; border:2px solid #0b5a3b; color:#0b5a3b; min-height:42px; padding:0 4px; border-radius:4px; font-weight:700; font-size:14px; }
+    .slot-btn:hover { background:#f0fff4; }
+    .no-days-msg { color:#4c6272; text-align:center; padding:40px 0; font-style:italic; }
+    .ca-slot-button { display:block; text-align:center; text-decoration:none; background:#fff; border:2px solid #0b5a3b; color:#0b5a3b; padding:12px 18px; border-radius:8px; font-weight:700; font-size:16px; }
+    .ca-walk-in-select { display:inline-block; margin-top:16px; }
+
+
+    /* The phone frame scrolls inside itself - never let the browser window scroll (overflow:clip can't be scrolled by script either) */
+    html:has(body.nhs-app-native:not(.nhs-app-no-frame)) { overflow:clip; }
+    .ca-count { margin:24px 0 12px; }
+    .ca-pager { font-size:16px; margin:0 0 20px; }
+    .ca-pager__list { display:flex; flex-wrap:wrap; align-items:center; gap:0 4px; list-style:none; margin:0; padding:0; }
+    .ca-pager__list li { margin:0; padding:0; }
+    .ca-pager__btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; min-width:44px; padding:0 4px; background:none; border:0; border-radius:0; font:inherit; font-size:16px; color:#005eb8; text-decoration:underline; cursor:pointer; }
+    .ca-pager__btn:hover { color:#7c2855; }
+    .ca-pager__btn.is-current, .ca-pager__btn.is-current:hover { background:#005eb8; color:#fff; }
+    .ca-pager__btn:focus, .ca-pager__btn.is-current:focus, .slot-btn:focus { outline:4px solid transparent; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; }
+    .ca-spinner__label { display:none; margin-top:12px; font-size:16px; }
+    .ca-arrow { flex:0 0 auto; }
+    .ca-cols-wrap { position:relative; touch-action:pan-y; margin-bottom:24px; user-select:none; -webkit-user-select:none; }
+    .ca-cols { display:grid; grid-template-columns:repeat(3, minmax(0, 105px)); justify-content:space-between; gap:0 8px; align-items:start; transition:opacity .15s; min-height:120px; }
+    .ca-cols.is-loading { opacity:.25; pointer-events:none; }
+    .ca-col { position:relative; display:flex; flex-direction:column; gap:16px; }
+    .ca-times { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:16px; }
+    .ca-times li { margin:0; padding:0; }
+    /* Skip link: hidden until focused, then overlays the date heading */
+    .ca-skip { position:absolute; top:0; left:0; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; font-size:14px; line-height:1.3; color:#005eb8; }
+    .ca-skip__line { display:block; }
+    .ca-skip:focus { width:100%; height:auto; overflow:visible; clip:auto; white-space:normal; z-index:2; padding:4px; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; outline:4px solid transparent; }
+    .ca-col__heading { font-size:16px; font-weight:400; line-height:1.4; margin:0 0 8px; color:#212b32; }
+    .ca-col__heading span { display:block; }
+    .ca-col__num { font-weight:700; }
+    .ca-col__heading { pointer-events:none; }
+    .ca-col__heading:focus { outline:none; }
+    .ca-col__heading:focus-visible { outline:4px solid transparent; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; }
+    .ca-col__heading:focus-visible .ca-col__month { color:#212b32; }
+    .ca-col__month { color:#4c6272; }
+    .ca-cols .slot-btn { border-bottom-width:4px; background:transparent; font-size:16px; min-height:48px; }
+    /* Selected state (focus / press): standard NHS yellow with black text and border */
+    .ca-cols .slot-btn:focus, .ca-cols .slot-btn:active { background-color:#ffeb3b; border-color:#212b32; color:#212b32; box-shadow:none; outline:4px solid transparent; }
+    .ca-spinner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; padding-top:60px; }
+    .ca-spinner[hidden] { display:none; }
+    .ca-spinner__ring { width:44px; height:44px; border:5px solid #d8dde0; border-top-color:#005eb8; border-radius:50%; animation:ca-spin .8s linear infinite; }
+    @keyframes ca-spin { to { transform:rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .ca-spinner__ring { animation:none; display:none; }
+      .ca-spinner__label { display:block; }
+      .ca-cols { transition:none; }
+    }
+
+  </style>
+
+  <div class="clinic-availability">
+
+    <h1 class="nhsapp-page-heading nhsuk-heading-l">Choose a time</h1>
+    <p class="ca-clinic-name">{{ clinic.name }}</p>
+
+    {% if clinic.distance %}
+      <p class="ca-meta-label" style="font-weight:400;">Location {{ clinic.distance }}</p>
+    {% endif %}
+    {% if clinic.address %}
+      <p class="ca-address nhsuk-body">{{ clinic.address }}</p>
+    {% endif %}
+    <p style="margin-bottom:16px;"><a class="nhsuk-link" href="#" style="font-size:16px;">Get directions</a></p>
+
+    <hr class="ca-section-break" />
+
+    {% if clinic.type == 'walk-in' %}
+
+      <h2 class="nhsuk-heading-m">Availability</h2>
+      <p class="nhsuk-body">{{ clinic.durationDesc }}</p>
+      {% if clinic.busyPeriods %}
+        <p class="nhsuk-body">{{ clinic.busyPeriods }}</p>
+      {% endif %}
+      <a class="ca-slot-button ca-walk-in-select" href="/pages/your-health/check?clinic={{ clinic.id | urlencode }}&postcode={{ postcode | urlencode }}&date={{ 'Walk in' | urlencode }}&time={{ 'Walk in' | urlencode }}">Select walk in</a>
+
+    {% else %}
+
+      <p class="nhsuk-body" style="margin-bottom:6px">{{ clinic.durationDesc }}</p>
+      <div class="filter-row">
+        <a class="filter-bar nhsuk-link" href="{{ filterPageUrl }}" aria-label="Filter by day and time">
+          <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <line x1="0" y1="1" x2="18" y2="1" stroke="currentColor" stroke-width="2"/>
+            <line x1="3" y1="7" x2="15" y2="7" stroke="currentColor" stroke-width="2"/>
+            <line x1="6" y1="13" x2="12" y2="13" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          Filter: Day and time{% if filterCount > 0 %} ({{ filterCount }}){% endif %}
+        </a>
+        {% if filterCount > 0 %}
+          <a class="clear-filters-btn" href="{{ clearFiltersUrl }}">Clear filters</a>
+        {% endif %}
+      </div>
+
+      <div id="sd-results" class="ca-results">
+        <div class="nhsuk-u-visually-hidden" id="ca-live" role="status" aria-live="polite"></div>
+        <h2 class="nhsuk-heading-m ca-count" id="ca-count"></h2>
+        <div class="ca-pager" id="ca-pager-top"></div>
+        <div class="ca-cols-wrap" id="ca-cols-wrap">
+          <div class="ca-cols" id="ca-cols"></div>
+          <div class="ca-spinner" id="ca-spinner" hidden aria-hidden="true"><div class="ca-spinner__ring"></div><p class="ca-spinner__label">Loading…</p></div>
+        </div>
+        <div class="ca-pager" id="ca-pager-bottom"></div>
+      </div>
+
+    {% endif %}
+
+    <h2 class="nhsuk-heading-m" id="ca-after" tabindex="-1" style="margin-top:40px;">Can't see a time suitable?</h2>
+    <ul class="nhsapp-cards">
+      <li class="nhsapp-card">
+        <div class="nhsapp-card__container">
+          <div class="nhsapp-card__content">
+            <a class="nhsapp-card__link nhsuk-link--no-visited-state nhsuk-u-font-size-22" href="#">Order a home test kit instead</a>
+          </div>
+          {{ nhsappIcon('chevronRight') }}
+        </div>
+      </li>
+    </ul>
+
+    <h2 class="nhsuk-heading-m">Booking over the phone</h2>
+    <p>The easiest way to book and manage a test is through this app. If you would prefer to speak to someone you can call 0800 123 456 (Monday to Friday, 9am to 5pm)</p>
+
+  </div>
+
+  <script type="application/json" id="days-data">{{ daysJson | safe }}</script>
+  <script type="application/json" id="clinic-meta">{"clinicId":"{{ clinic.id | urlencode }}","postcode":"{{ postcode | urlencode }}"}</script>
+
+  <script>
+    (function () {
+      var el = document.getElementById('days-data');
+      if (!el || !document.getElementById('ca-cols')) return;
+      var daysData = JSON.parse(el.textContent);
+      var meta = JSON.parse(document.getElementById('clinic-meta').textContent);
+      var activeFilters = {{ activeFiltersJson | safe }};
+
+      var PER_PAGE = 3;
+      var SPINNER_MS = 1000;
+      var MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      var DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+      var TODAY = new Date(); TODAY.setHours(0, 0, 0, 0);
+      function isoDate(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+      function parseHour(t) {
+        var s = (t || '').trim().toLowerCase();
+        if (s === 'midnight') return 0;
+        if (s === 'midday') return 12;
+        var m = s.match(/(\d+)(?:[:.](\d+))?\s*(am|pm)/i);
+        if (!m) return 0;
+        var h = parseInt(m[1], 10), p = m[3].toLowerCase();
+        if (p === 'pm' && h !== 12) h += 12;
+        if (p === 'am' && h === 12) h = 0;
+        return h;
+      }
+      function filterSlots(slots) {
+        if (!activeFilters.times.length) return slots;
+        return slots.filter(function (slot) {
+          var h = parseHour(slot.start);
+          return activeFilters.times.some(function (f) {
+            if (f === 'before9') return h < 9;
+            if (f === 'morning') return h >= 9 && h < 12;
+            if (f === 'early-afternoon') return h >= 12 && h < 14;
+            if (f === 'late-afternoon') return h >= 14 && h < 17;
+            if (f === 'evening') return h >= 17;
+            return false;
+          });
+        });
+      }
+
+      // Same agreed data logic as before: days with slots in the next 56 days, same filters
+      var days = [];
+      for (var off = 0; off < 56; off++) {
+        var date = new Date(TODAY); date.setDate(TODAY.getDate() + off);
+        var iso = isoDate(date), d = null;
+        for (var i = 0; i < daysData.length; i++) { if (daysData[i].iso === iso) { d = daysData[i]; break; } }
+        if (!d || !d.hasSlots) continue;
+        var dayName = DAYS[date.getDay()];
+        if (activeFilters.date && iso !== activeFilters.date) continue;
+        if (activeFilters.days.length && activeFilters.days.indexOf(dayName) === -1) continue;
+        var slots = filterSlots(d.morning).concat(filterSlots(d.afternoon), filterSlots(d.evening));
+        if (!slots.length) continue;
+        days.push({ data: d, slots: slots, dayName: dayName, dateNum: date.getDate(), month: MONTHS[date.getMonth()] });
+      }
+
+      var totalPages = Math.max(1, Math.ceil(days.length / PER_PAGE));
+      var page = 0, busy = false;
+
+      var cols = document.getElementById('ca-cols');
+      var spinner = document.getElementById('ca-spinner');
+      var ARROW_R = '<svg class="ca-arrow" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>';
+      var ARROW_L = '<svg class="ca-arrow" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12H5M11 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>';
+
+      function slotHref(d, s) {
+        return '/pages/your-health/check?clinic=' + meta.clinicId + '&postcode=' + meta.postcode +
+          '&date=' + encodeURIComponent(d.dateLabel) + '&time=' + encodeURIComponent(s.start);
+      }
+
+      // Numbered pager: Previous, first / current / last page numbers, Next.
+      // The current page is a button too (aria-current) so focus has somewhere to land after paging.
+      function vh(t) { return '<span class="nhsuk-u-visually-hidden">' + t + '</span>'; }
+      function pagerHtml(bottom) {
+        if (totalPages === 1) return '';
+        var hasPrev = page > 0, hasNext = page < totalPages - 1;
+        var nums = [0];
+        if (page !== 0 && page !== totalPages - 1) nums.push(page);
+        nums.push(totalPages - 1);
+        var h = '<nav aria-label="Days, ' + (bottom ? 'bottom' : 'top') + '"><ul class="ca-pager__list">';
+        if (hasPrev) h += '<li><button type="button" class="ca-pager__btn" data-dir="-1">' + ARROW_L + '<span>Previous' + vh(' 3 days') + '</span></button></li>';
+        nums.forEach(function (i) {
+          var cur = i === page;
+          var label = 'Page ' + (i + 1) + (cur ? ', current page' : (i === totalPages - 1 ? ', last page' : ''));
+          h += '<li><button type="button" class="ca-pager__btn ca-pager__num' + (cur ? ' is-current' : '') + '" data-page="' + i + '" aria-label="' + label + '"' + (cur ? ' aria-current="page"' : '') + '>' + (i + 1) + '</button></li>';
+        });
+        if (hasNext) h += '<li><button type="button" class="ca-pager__btn" data-dir="1"><span>Next' + vh(' 3 days') + '</span>' + ARROW_R + '</button></li>';
+        return h + '</ul></nav>';
+      }
+
+      // "Skip to" / day name / date, each on its own line
+      function skipText(prefix, d) {
+        return '<span class="ca-skip__line">' + prefix + ' </span><span class="ca-skip__line">' + d.dayName + ' </span><span class="ca-skip__line">' + d.dateNum + ' ' + d.month + '</span>';
+      }
+
+      function render() {
+        document.getElementById('ca-count').textContent = days.length + (days.length === 1 ? ' day' : ' days') + ' with appointments';
+        if (!days.length) {
+          cols.innerHTML = '<p class="no-days-msg">No availability matching your filters.</p>';
+          document.getElementById('ca-pager-top').innerHTML = '';
+          document.getElementById('ca-pager-bottom').innerHTML = '';
+          return;
+        }
+        var visible = days.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+        cols.innerHTML = visible.map(function (day, idx) {
+          var n = day.slots.length;
+          // Next date overall: either in this set, or the first date of the next set
+          var nextDay = days[page * PER_PAGE + idx + 1];
+          var skip = '';
+          if (n > 1) {
+            if (nextDay) {
+              var inPage = idx + 1 < visible.length;
+              skip = '<a class="ca-skip" href="#ca-day-' + (idx + 1) + '" data-skip="' + (inPage ? 'day' : 'page') + '" data-idx="' + (idx + 1) + '">' + skipText('Skip to', nextDay) + '</a>';
+            } else {
+              skip = '<a class="ca-skip" href="#ca-after" data-skip="end">Skip to other options</a>';
+            }
+          }
+          // Back link sits BEFORE the heading so Shift+Tab from a date reaches it before the previous date's times
+          var prevDay = days[page * PER_PAGE + idx - 1], back = '';
+          if (prevDay && prevDay.slots.length > 1) {
+            var prevInPage = idx > 0;
+            back = '<a class="ca-skip" href="#ca-day-' + (idx - 1) + '" data-skip="' + (prevInPage ? 'day' : 'prevpage') + '" data-idx="' + (idx - 1) + '">' + skipText('Back to', prevDay) + '</a>';
+          }
+          return '<div class="ca-col" id="ca-day-' + idx + '">' + back + '<h3 class="ca-col__heading" tabindex="-1"><span class="ca-col__day">' + day.dayName + ' </span><span class="ca-col__num">' + day.dateNum + ' </span><span class="ca-col__month">' + day.month + '</span>' + vh(', ' + n + (n === 1 ? ' time' : ' times')) + '</h3>' +
+            skip +
+            '<ul class="ca-times" role="list">' +
+            day.slots.map(function (s) {
+              return '<li><a class="slot-btn" href="' + slotHref(day.data, s) + '"><span class="nhsuk-u-visually-hidden">' + day.data.dateLabel + ' </span>' + s.start + '</a></li>';
+            }).join('') + '</ul></div>';
+        }).join('');
+        document.getElementById('ca-pager-top').innerHTML = pagerHtml(false);
+        document.getElementById('ca-pager-bottom').innerHTML = pagerHtml(true);
+      }
+
+      var live = document.getElementById('ca-live');
+      var pagers = [document.getElementById('ca-pager-top'), document.getElementById('ca-pager-bottom')];
+      function setBusy(on) {
+        [cols].concat(pagers).forEach(function (n) { if (on) n.setAttribute('inert', ''); else n.removeAttribute('inert'); });
+        cols.setAttribute('aria-busy', on ? 'true' : 'false');
+        cols.classList.toggle('is-loading', on);
+        spinner.hidden = !on;
+      }
+      function rangeText() {
+        var from = page * PER_PAGE + 1, to = Math.min(days.length, from + PER_PAGE - 1);
+        return 'Showing days ' + from + ' to ' + to + ' of ' + days.length;
+      }
+
+      function go(dir, fromPager, kind) {
+        var next = page + dir;
+        if (busy || next < 0 || next >= totalPages) return;
+        busy = true;
+        live.textContent = 'Loading';
+        setBusy(true);
+        // Remember where the page is scrolled so the swap never moves it
+        var scroller = cols.closest('.app-width-container');
+        var scrollTop = scroller ? scroller.scrollTop : 0;
+        setTimeout(function () {
+          page = next;
+          render();
+          setBusy(false);
+          busy = false;
+          if (history.replaceState) history.replaceState(null, '', '#page=' + (page + 1));
+          live.textContent = rangeText();
+          // The pressed button was replaced, so refocus the same button in the same pager.
+          // If it no longer exists (end of the list), use the remaining one.
+          if (fromPager === 'lastheading') {
+            // Went back past the first date: land on the last date of the previous set
+            var hs = cols.querySelectorAll('.ca-col__heading');
+            if (hs.length) hs[hs.length - 1].focus();
+          } else if (fromPager === 'heading') {
+            // Skipped past the third date: land on the first date of the new set
+            var h = cols.querySelector('.ca-col__heading');
+            if (h) h.focus();
+          } else if (fromPager !== undefined) {
+            var pg = pagers[fromPager];
+            var btn = (kind === 'num' ? pg.querySelector('[aria-current="page"]') : pg.querySelector('[data-dir="' + dir + '"]')) || pg.querySelector('[aria-current="page"]');
+            if (btn) btn.focus({ preventScroll: true });
+          }
+          if (scroller) scroller.scrollTop = scrollTop;
+        }, SPINNER_MS);
+      }
+
+      // Skip links: move focus to the next date heading (next Tab reaches its skip link), or the page controls
+      document.getElementById('sd-results').addEventListener('click', function (e) {
+        var sk = e.target.closest('.ca-skip');
+        if (!sk) return;
+        e.preventDefault();
+        var target, kind = sk.getAttribute('data-skip');
+        if (kind === 'page') { go(1, 'heading'); return; }
+        if (kind === 'prevpage') { go(-1, 'lastheading'); return; }
+        if (kind === 'day') {
+          var col = document.getElementById('ca-day-' + sk.getAttribute('data-idx'));
+          target = col && col.querySelector('.ca-col__heading');
+        } else {
+          target = document.getElementById('ca-after');
+        }
+        if (target) target.focus();
+      });
+
+      document.getElementById('sd-results').addEventListener('click', function (e) {
+        var a = e.target.closest('.ca-pager__btn');
+        if (!a) return;
+        e.preventDefault();
+        var idx = pagers.indexOf(a.closest('.ca-pager'));
+        if (a.hasAttribute('data-page')) go(parseInt(a.getAttribute('data-page'), 10) - page, idx, 'num');
+        else go(parseInt(a.getAttribute('data-dir'), 10), idx);
+      });
+
+      // Swipe the block of 3 days: swipe left = next 3, swipe right = previous 3
+      var wrap = document.getElementById('ca-cols-wrap');
+      var sx = 0, sy = 0, tracking = false;
+      wrap.addEventListener('touchstart', function (e) {
+        if (e.touches.length !== 1) return;
+        sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true;
+      }, { passive: true });
+      wrap.addEventListener('touchend', function (e) {
+        if (!tracking) return; tracking = false;
+        var t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+      }, { passive: true });
+      // Mouse drag for desktop prototype testing
+      var mx = 0, my = 0, dragging = false;
+      wrap.addEventListener('mousedown', function (e) { mx = e.clientX; my = e.clientY; dragging = true; });
+      document.addEventListener('mouseup', function (e) {
+        if (!dragging) return; dragging = false;
+        var dx = e.clientX - mx, dy = e.clientY - my;
+        if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+      });
+      wrap.addEventListener('dragstart', function (e) { e.preventDefault(); });
+
+      // Restore the page after Back from the check screen
+      var m = /page=(\d+)/.exec(location.hash);
+      if (m) page = Math.min(totalPages, Math.max(1, parseInt(m[1], 10))) - 1;
+      render();
+    })();
+  </script>
+
+{% endblock %}
