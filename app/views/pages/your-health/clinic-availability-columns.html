@@ -58,8 +58,10 @@
     .ca-pager__list li { margin:0; padding:0; }
     .ca-pager__btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; min-width:44px; padding:0 4px; background:none; border:0; border-radius:0; font:inherit; font-size:16px; color:#005eb8; text-decoration:underline; cursor:pointer; }
     .ca-pager__btn:hover { color:#7c2855; }
+    .ca-pager__btn[data-pointer]:focus-visible { background:none; box-shadow:none; color:#005eb8; text-decoration:underline; }
+    .ca-pager__btn.is-current[data-pointer]:focus-visible { background:#005eb8; color:#fff; }
     .ca-pager__btn.is-current, .ca-pager__btn.is-current:hover { background:#005eb8; color:#fff; }
-    .ca-pager__btn:focus, .ca-pager__btn.is-current:focus, .slot-btn:focus { outline:4px solid transparent; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; }
+    .ca-pager__btn:focus-visible, .ca-pager__btn.is-current:focus-visible, .slot-btn:focus-visible { outline:4px solid transparent; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; }
     .ca-spinner__label { display:none; margin-top:12px; font-size:16px; }
     .ca-arrow { flex:0 0 auto; }
     .ca-cols-wrap { position:relative; touch-action:pan-y; margin-bottom:24px; user-select:none; -webkit-user-select:none; }
@@ -71,7 +73,7 @@
     /* Skip link: hidden until focused, then overlays the date heading */
     .ca-skip { position:absolute; top:0; left:0; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; font-size:16px; line-height:1.4; color:#005eb8; }
     .ca-skip__line { display:block; }
-    .ca-skip:focus { width:100%; height:auto; min-height:80px; box-sizing:border-box; overflow:visible; clip:auto; white-space:normal; z-index:2; padding:4px; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; outline:4px solid transparent; }
+    .ca-skip:focus-visible { width:100%; height:auto; min-height:80px; box-sizing:border-box; overflow:visible; clip:auto; white-space:normal; z-index:2; padding:4px; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; outline:4px solid transparent; }
     .ca-col__heading { font-size:16px; font-weight:400; line-height:1.4; margin:0 0 8px; color:#212b32; }
     .ca-col__heading span { display:block; }
     .ca-col__num { font-weight:700; font-size:20px; }
@@ -81,8 +83,12 @@
     .ca-col__heading:focus-visible .ca-col__month { color:#212b32; }
     .ca-col__month { color:#4c6272; }
     .ca-cols .slot-btn { border-bottom-width:4px; background:transparent; font-size:16px; min-height:48px; }
-    /* Selected state (focus / press): standard NHS yellow with black text and border */
-    .ca-cols .slot-btn:focus, .ca-cols .slot-btn:active { background-color:#ffeb3b; border-color:#212b32; color:#212b32; box-shadow:none; outline:4px solid transparent; }
+    /* Hover: grey-green fill, darker green border and text (mouse only, so touch doesn't get a stuck hover) */
+    @media (hover:hover) {
+      .ca-cols .slot-btn:hover { background-color:#ccd7d2; border-color:#01381d; color:#01381d; }
+    }
+    /* Selected state (tab focus / press): yellow, black text, dark green bottom bar */
+    .ca-cols .slot-btn:focus-visible, .ca-cols .slot-btn:active { background-color:#ffea00; border-color:#ffea00; border-bottom-color:#01381d; color:#000; box-shadow:none; outline:4px solid transparent; }
     .ca-spinner { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; padding-top:60px; }
     .ca-spinner[hidden] { display:none; }
     .ca-spinner__ring { width:44px; height:44px; border:5px solid #d8dde0; border-top-color:#005eb8; border-radius:50%; animation:ca-spin .8s linear infinite; }
@@ -266,9 +272,9 @@
         return h + '</ul></nav>';
       }
 
-      // "Skip to" / day name / date, each on its own line
+      // "Skip to" / day name + number / month, each on its own line
       function skipText(prefix, d) {
-        return '<span class="ca-skip__line">' + prefix + ' </span><span class="ca-skip__line">' + d.dayName + ' </span><span class="ca-skip__line">' + d.dateNum + ' ' + d.month + '</span>';
+        return '<span class="ca-skip__line">' + prefix + ' </span><span class="ca-skip__line">' + d.dayName + ' ' + d.dateNum + ' </span><span class="ca-skip__line">' + d.month + '</span>';
       }
 
       function render() {
@@ -323,7 +329,7 @@
         return 'Showing days ' + from + ' to ' + to + ' of ' + days.length;
       }
 
-      function go(dir, fromPager, kind) {
+      function go(dir, fromPager, kind, pointer) {
         var next = page + dir;
         if (busy || next < 0 || next >= totalPages) return;
         busy = true;
@@ -350,13 +356,31 @@
             var h = cols.querySelector('.ca-col__heading');
             if (h) h.focus();
           } else if (fromPager !== undefined) {
-            var pg = pagers[fromPager];
+            // Bottom pager: the new dates are above, so use the matching top control (and scroll up to it below)
+            var pg = pagers[fromPager === 1 ? 0 : fromPager];
             var btn = (kind === 'num' ? pg.querySelector('[aria-current="page"]') : pg.querySelector('[data-dir="' + dir + '"]')) || pg.querySelector('[aria-current="page"]');
-            if (btn) btn.focus({ preventScroll: true });
+            if (btn) {
+              btn.focus({ preventScroll: true });
+              // Mouse/touch click: keep focus for assistive tech but don't show the keyboard focus style
+              if (pointer) btn.setAttribute('data-pointer', '');
+            }
           }
-          if (scroller) scroller.scrollTop = scrollTop;
+          if (fromPager === 1) {
+            // Bottom pager used: take the user back to the top of the dates
+            var count = document.getElementById('ca-count');
+            if (scroller) scroller.scrollTop += count.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12;
+            else window.scrollBy(0, count.getBoundingClientRect().top - 12);
+          } else if (scroller) {
+            scroller.scrollTop = scrollTop;
+          }
         }, SPINNER_MS);
       }
+
+      // Any key press brings the focus style back
+      document.addEventListener('keydown', function () {
+        var el = document.activeElement;
+        if (el && el.hasAttribute && el.hasAttribute('data-pointer')) el.removeAttribute('data-pointer');
+      });
 
       // Skip links: move focus to the next date heading (next Tab reaches its skip link), or the page controls
       document.getElementById('sd-results').addEventListener('click', function (e) {
@@ -380,8 +404,9 @@
         if (!a) return;
         e.preventDefault();
         var idx = pagers.indexOf(a.closest('.ca-pager'));
-        if (a.hasAttribute('data-page')) go(parseInt(a.getAttribute('data-page'), 10) - page, idx, 'num');
-        else go(parseInt(a.getAttribute('data-dir'), 10), idx);
+        var pointer = e.detail !== 0; // 0 = activated from the keyboard
+        if (a.hasAttribute('data-page')) go(parseInt(a.getAttribute('data-page'), 10) - page, idx, 'num', pointer);
+        else go(parseInt(a.getAttribute('data-dir'), 10), idx, undefined, pointer);
       });
 
       // Swipe the block of 3 days: swipe left = next 3, swipe right = previous 3
