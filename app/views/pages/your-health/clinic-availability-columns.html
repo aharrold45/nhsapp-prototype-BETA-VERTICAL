@@ -54,21 +54,26 @@
     html:has(body.nhs-app-native:not(.nhs-app-no-frame)) { overflow-y:hidden; scrollbar-gutter:stable; }
     .ca-count { margin:24px 0 12px; }
     .ca-pager { font-size:16px; margin:0 0 20px; }
-    .ca-pager__list { display:flex; flex-wrap:wrap; align-items:center; gap:0 4px; list-style:none; margin:0; padding:0; }
+    .ca-pager__list { display:flex; flex-wrap:wrap; align-items:center; gap:0; list-style:none; margin:0; padding:0; }
     .ca-pager__list li { margin:0; padding:0; }
-    .ca-pager__btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; min-width:44px; padding:0 4px; background:none; border:0; border-radius:0; font:inherit; font-size:16px; color:#005eb8; text-decoration:underline; cursor:pointer; }
+    .ca-pager__gap { min-width:24px; text-align:center; color:#4c6272; font-size:12px; letter-spacing:1px; user-select:none; }
+    .ca-pager__btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:36px; min-width:36px; padding:0 4px; background:none; border:0; border-radius:0; font:inherit; font-size:16px; color:#005eb8; text-decoration:underline; cursor:pointer; }
     .ca-pager__btn:hover { color:#7c2855; }
     .ca-pager__btn[data-pointer]:focus-visible { background:none; box-shadow:none; color:#005eb8; text-decoration:underline; }
     .ca-pager__btn.is-current[data-pointer]:focus-visible { background:#005eb8; color:#fff; }
     .ca-pager__btn.is-current, .ca-pager__btn.is-current:hover { background:#005eb8; color:#fff; }
+    .ca-pager__btn.is-current { margin:0 8px; }
+    /* 24px of visible space between Previous / Next and the numbers (the 36px number boxes already add space around the digits) */
+    .ca-pager__btn[data-dir="-1"] { margin-right:7px; }
+    .ca-pager__btn[data-dir="1"] { margin-left:11px; }
     .ca-pager__btn:focus-visible, .ca-pager__btn.is-current:focus-visible, .slot-btn:focus-visible { outline:4px solid transparent; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; }
     .ca-spinner__label { display:none; margin-top:12px; font-size:16px; }
     .ca-arrow { flex:0 0 auto; }
     .ca-cols-wrap { position:relative; touch-action:pan-y; margin-bottom:24px; user-select:none; -webkit-user-select:none; }
-    .ca-cols { display:grid; grid-template-columns:repeat(3, minmax(0, 105px)); justify-content:space-between; gap:0 8px; align-items:start; transition:opacity .15s; min-height:120px; }
+    .ca-cols { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:0 24px; align-items:start; transition:opacity .15s; min-height:120px; }
     .ca-cols.is-loading { opacity:.25; pointer-events:none; }
     .ca-col { position:relative; display:flex; flex-direction:column; gap:16px; }
-    .ca-times { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:16px; }
+    .ca-times { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:24px; }
     .ca-times li { margin:0; padding:0; }
     /* Skip link: hidden until focused, then overlays the date heading */
     .ca-skip { position:absolute; top:0; left:0; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; font-size:16px; line-height:1.4; color:#005eb8; }
@@ -244,8 +249,6 @@
 
       var cols = document.getElementById('ca-cols');
       var spinner = document.getElementById('ca-spinner');
-      var ARROW_R = '<svg class="ca-arrow" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>';
-      var ARROW_L = '<svg class="ca-arrow" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12H5M11 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>';
 
       function slotHref(d, s) {
         return '/pages/your-health/check?clinic=' + meta.clinicId + '&postcode=' + meta.postcode +
@@ -257,18 +260,25 @@
       function vh(t) { return '<span class="nhsuk-u-visually-hidden">' + t + '</span>'; }
       function pagerHtml(bottom) {
         if (totalPages === 1) return '';
-        var hasPrev = page > 0, hasNext = page < totalPages - 1;
-        var nums = [0];
-        if (page !== 0 && page !== totalPages - 1) nums.push(page);
-        nums.push(totalPages - 1);
-        var h = '<nav aria-label="Days, ' + (bottom ? 'bottom' : 'top') + '"><ul class="ca-pager__list">';
-        if (hasPrev) h += '<li><button type="button" class="ca-pager__btn" data-dir="-1">' + ARROW_L + '<span>Previous' + vh(' 3 days') + '</span></button></li>';
-        nums.forEach(function (i) {
+        var last = totalPages - 1;
+        var hasPrev = page > 0, hasNext = page < last;
+        function numLi(i) {
           var cur = i === page;
-          var label = 'Page ' + (i + 1) + (cur ? ', current page' : (i === totalPages - 1 ? ', last page' : ''));
-          h += '<li><button type="button" class="ca-pager__btn ca-pager__num' + (cur ? ' is-current' : '') + '" data-page="' + i + '" aria-label="' + label + '"' + (cur ? ' aria-current="page"' : '') + '>' + (i + 1) + '</button></li>';
-        });
-        if (hasNext) h += '<li><button type="button" class="ca-pager__btn" data-dir="1"><span>Next' + vh(' 3 days') + '</span>' + ARROW_R + '</button></li>';
+          var label = 'Page ' + (i + 1) + (cur ? ', current page' : (i === last ? ', last page' : ''));
+          return '<li><button type="button" class="ca-pager__btn ca-pager__num' + (cur ? ' is-current' : '') + '" data-page="' + i + '" aria-label="' + label + '"' + (cur ? ' aria-current="page"' : '') + '>' + (i + 1) + '</button></li>';
+        }
+        var dots = '<li class="ca-pager__gap" aria-hidden="true">&bull;&bull;&bull;</li>';
+        var emptyGap = '<li class="ca-pager__gap" aria-hidden="true"></li>';
+        // Middle pages use fixed slots (first, gap, middle, gap, last) so numbers stay put and ellipses have room
+        // even when hidden. The first and last pages are the exception: compact, ellipsis straight between the numbers.
+        var middle = (page > 0 && page < last) ? page : null;
+        var gapA, gapB;
+        if (middle === null) { gapA = last > 1 ? dots : ''; gapB = ''; }
+        else { gapA = middle > 1 ? dots : emptyGap; gapB = last - middle > 1 ? dots : emptyGap; }
+        var h = '<nav aria-label="Days, ' + (bottom ? 'bottom' : 'top') + '"><ul class="ca-pager__list">';
+        if (hasPrev) h += '<li><button type="button" class="ca-pager__btn" data-dir="-1"><span>Previous' + vh(' 3 days') + '</span></button></li>';
+        h += numLi(0) + gapA + (middle === null ? '' : numLi(middle)) + gapB + numLi(last);
+        if (hasNext) h += '<li><button type="button" class="ca-pager__btn" data-dir="1"><span>Next' + vh(' 3 days') + '</span></button></li>';
         return h + '</ul></nav>';
       }
 
