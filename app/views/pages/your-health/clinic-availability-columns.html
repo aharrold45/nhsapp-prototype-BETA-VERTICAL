@@ -75,17 +75,15 @@
     .ca-col { position:relative; display:flex; flex-direction:column; gap:16px; }
     .ca-times { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:24px; }
     .ca-times li { margin:0; padding:0; }
-    /* Skip link: hidden until focused, then overlays the date heading */
-    .ca-skip { position:absolute; top:0; left:0; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; font-size:16px; line-height:1.4; color:#005eb8; }
-    .ca-skip__line { display:block; }
-    .ca-skip:focus-visible { width:100%; height:auto; min-height:80px; box-sizing:border-box; overflow:visible; clip:auto; white-space:normal; z-index:2; padding:4px; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; text-decoration:none; outline:4px solid transparent; }
+    .ca-times-wrap { position:relative; }
+    /* While any skip link has focus, all three columns' times move down together to make room for it */
+    .ca-cols:has(.ca-skip:focus) .ca-times-wrap { margin-top:24px; }
+    /* Skip link: hidden until it has keyboard focus, then shown in the space above the first time */
+    .ca-skip { position:absolute; top:-38px; left:0; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; font-size:14px; line-height:1.3; color:#005eb8; }
+    .ca-skip:focus { width:auto; height:auto; overflow:visible; clip:auto; z-index:2; padding:3px 6px; background-color:#ffeb3b; box-shadow:0 4px #212b32; color:#212b32; text-decoration:none; outline:4px solid transparent; }
     .ca-col__heading { font-size:16px; font-weight:400; line-height:1.4; margin:0 0 8px; color:#212b32; }
     .ca-col__heading span { display:block; }
     .ca-col__num { font-weight:700; font-size:20px; }
-    .ca-col__heading { pointer-events:none; }
-    .ca-col__heading:focus { outline:none; }
-    .ca-col__heading:focus-visible { outline:4px solid transparent; background-color:#ffeb3b; box-shadow:0 -2px #ffeb3b, 0 4px #212b32; color:#212b32; }
-    .ca-col__heading:focus-visible .ca-col__month { color:#212b32; }
     .ca-col__month { color:#4c6272; }
     .ca-cols .slot-btn { border-bottom-width:4px; background:transparent; font-size:16px; min-height:48px; }
     /* Hover: grey-green fill, darker green border and text (mouse only, so touch doesn't get a stuck hover) */
@@ -160,12 +158,12 @@
 
     {% endif %}
 
-    <h2 class="nhsuk-heading-m" id="ca-after" tabindex="-1" style="margin-top:40px;">Can't see a time suitable?</h2>
+    <h2 class="nhsuk-heading-m" style="margin-top:40px;">Can't see a time suitable?</h2>
     <ul class="nhsapp-cards">
       <li class="nhsapp-card">
         <div class="nhsapp-card__container">
           <div class="nhsapp-card__content">
-            <a class="nhsapp-card__link nhsuk-link--no-visited-state nhsuk-u-font-size-22" href="#">Order a home test kit instead</a>
+            <a id="ca-other-options" class="nhsapp-card__link nhsuk-link--no-visited-state nhsuk-u-font-size-22" href="#">Order a home test kit instead</a>
           </div>
           {{ nhsappIcon('chevronRight') }}
         </div>
@@ -282,11 +280,6 @@
         return h + '</ul></nav>';
       }
 
-      // "Skip to" / day name + number / month, each on its own line
-      function skipText(prefix, d) {
-        return '<span class="ca-skip__line">' + prefix + ' </span><span class="ca-skip__line">' + d.dayName + ' ' + d.dateNum + ' </span><span class="ca-skip__line">' + d.month + '</span>';
-      }
-
       function render() {
         document.getElementById('ca-count').textContent = days.length + (days.length === 1 ? ' day' : ' days') + ' with appointments';
         if (!days.length) {
@@ -298,29 +291,17 @@
         var visible = days.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
         cols.innerHTML = visible.map(function (day, idx) {
           var n = day.slots.length;
-          // Next date overall: either in this set, or the first date of the next set
-          var nextDay = days[page * PER_PAGE + idx + 1];
-          var skip = '';
+          // One skip link per date (only when there is something to skip): next date, or the options after the times
+          var nextDay = days[page * PER_PAGE + idx + 1], skip = '';
           if (n > 1) {
-            if (nextDay) {
-              var inPage = idx + 1 < visible.length;
-              skip = '<a class="ca-skip" href="#ca-day-' + (idx + 1) + '" data-skip="' + (inPage ? 'day' : 'page') + '" data-idx="' + (idx + 1) + '">' + skipText('Skip to', nextDay) + '</a>';
-            } else {
-              skip = '<a class="ca-skip" href="#ca-after" data-skip="end">Skip to other options</a>';
-            }
+            if (nextDay) skip = '<a class="ca-skip" href="#' + (idx + 1 < visible.length ? 'ca-day-' + (idx + 1) : 'ca-pager-bottom') + '" data-skip="next">Next date' + vh(', ' + nextDay.dayName + ' ' + nextDay.dateNum + ' ' + nextDay.month) + '</a>';
+            else skip = '<a class="ca-skip" href="#ca-other-options" data-skip="end">Other options' + vh(", can't see a time suitable") + '</a>';
           }
-          // Back link sits BEFORE the heading so Shift+Tab from a date reaches it before the previous date's times
-          var prevDay = days[page * PER_PAGE + idx - 1], back = '';
-          if (prevDay && prevDay.slots.length > 1) {
-            var prevInPage = idx > 0;
-            back = '<a class="ca-skip" href="#ca-day-' + (idx - 1) + '" data-skip="' + (prevInPage ? 'day' : 'prevpage') + '" data-idx="' + (idx - 1) + '">' + skipText('Back to', prevDay) + '</a>';
-          }
-          return '<div class="ca-col" id="ca-day-' + idx + '">' + back + '<h3 class="ca-col__heading" tabindex="-1"><span class="ca-col__day">' + day.dayName + ' </span><span class="ca-col__num">' + day.dateNum + ' </span><span class="ca-col__month">' + day.month + '</span>' + vh(', ' + n + (n === 1 ? ' time' : ' times')) + '</h3>' +
-            skip +
-            '<ul class="ca-times" role="list">' +
+          return '<div class="ca-col" id="ca-day-' + idx + '" role="group" aria-labelledby="ca-date-' + idx + '"><h3 class="ca-col__heading" id="ca-date-' + idx + '"><span class="ca-col__day">' + day.dayName + ' </span><span class="ca-col__num">' + day.dateNum + ' </span><span class="ca-col__month">' + day.month + '</span>' + vh(', ' + n + (n === 1 ? ' time' : ' times')) + '</h3>' +
+            '<div class="ca-times-wrap">' + skip + '<ul class="ca-times" role="list">' +
             day.slots.map(function (s) {
-              return '<li><a class="slot-btn" href="' + slotHref(day.data, s) + '"><span class="nhsuk-u-visually-hidden">' + day.data.dateLabel + ' </span>' + s.start + '</a></li>';
-            }).join('') + '</ul></div>';
+              return '<li><a class="slot-btn" href="' + slotHref(day.data, s) + '">' + s.start + '<span class="nhsuk-u-visually-hidden"> ' + day.data.dateLabel + '</span></a></li>';
+            }).join('') + '</ul></div></div>';
         }).join('');
         document.getElementById('ca-pager-top').innerHTML = pagerHtml(false);
         document.getElementById('ca-pager-bottom').innerHTML = pagerHtml(true);
@@ -357,14 +338,11 @@
           live.textContent = rangeText();
           // The pressed button was replaced, so refocus the same button in the same pager.
           // If it no longer exists (end of the list), use the remaining one.
-          if (fromPager === 'lastheading') {
-            // Went back past the first date: land on the last date of the previous set
-            var hs = cols.querySelectorAll('.ca-col__heading');
-            if (hs.length) hs[hs.length - 1].focus();
-          } else if (fromPager === 'heading') {
-            // Skipped past the third date: land on the first date of the new set
-            var h = cols.querySelector('.ca-col__heading');
-            if (h) h.focus();
+          if (fromPager === 'skip') {
+            // Skipped past the third date: land on the first date's skip link (or its first time)
+            var c0 = cols.querySelector('.ca-col');
+            var t0 = c0 && (c0.querySelector('.ca-skip') || c0.querySelector('.slot-btn'));
+            if (t0) t0.focus();
           } else if (fromPager !== undefined) {
             // Bottom pager: the new dates are above, so use the matching top control (and scroll up to it below)
             var pg = pagers[fromPager === 1 ? 0 : fromPager];
@@ -380,11 +358,38 @@
             var count = document.getElementById('ca-count');
             if (scroller) scroller.scrollTop += count.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 12;
             else window.scrollBy(0, count.getBoundingClientRect().top - 12);
-          } else if (scroller) {
+          } else if (scroller && fromPager !== 'skip') {
             scroller.scrollTop = scrollTop;
           }
         }, SPINNER_MS);
       }
+
+      // Arrow keys (in addition to Tab): pager buttons move left/right; times move up/down within a date
+      // and left/right between dates. Screen readers in browse mode keep their own arrow keys, so Tab always works too.
+      document.getElementById('sd-results').addEventListener('keydown', function (e) {
+        if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+        var key = e.key, el = e.target, next = null;
+        if (el.classList && el.classList.contains('ca-pager__btn')) {
+          var btns = Array.prototype.slice.call(el.closest('.ca-pager__list').querySelectorAll('.ca-pager__btn'));
+          var i = btns.indexOf(el);
+          if (key === 'ArrowRight') next = btns[i + 1];
+          else if (key === 'ArrowLeft') next = btns[i - 1];
+        } else if (el.classList && el.classList.contains('slot-btn')) {
+          var col = el.closest('.ca-col');
+          var times = Array.prototype.slice.call(col.querySelectorAll('.slot-btn'));
+          var j = times.indexOf(el);
+          if (key === 'ArrowDown') next = times[j + 1];
+          else if (key === 'ArrowUp') next = times[j - 1];
+          else if (key === 'ArrowRight' || key === 'ArrowLeft') {
+            var other = key === 'ArrowRight' ? col.nextElementSibling : col.previousElementSibling;
+            if (other && other.classList.contains('ca-col')) {
+              var ot = other.querySelectorAll('.slot-btn');
+              next = ot[Math.min(j, ot.length - 1)];
+            }
+          }
+        }
+        if (next) { e.preventDefault(); next.focus(); }
+      });
 
       // Any key press brings the focus style back
       document.addEventListener('keydown', function () {
@@ -392,19 +397,18 @@
         if (el && el.hasAttribute && el.hasAttribute('data-pointer')) el.removeAttribute('data-pointer');
       });
 
-      // Skip links: move focus to the next date heading (next Tab reaches its skip link), or the page controls
+      // Skip links: chain from date to date (focus the next date's skip link, or its first time)
       document.getElementById('sd-results').addEventListener('click', function (e) {
         var sk = e.target.closest('.ca-skip');
         if (!sk) return;
         e.preventDefault();
-        var target, kind = sk.getAttribute('data-skip');
-        if (kind === 'page') { go(1, 'heading'); return; }
-        if (kind === 'prevpage') { go(-1, 'lastheading'); return; }
-        if (kind === 'day') {
-          var col = document.getElementById('ca-day-' + sk.getAttribute('data-idx'));
-          target = col && col.querySelector('.ca-col__heading');
+        var target;
+        if (sk.getAttribute('data-skip') === 'end') {
+          target = document.getElementById('ca-other-options');
         } else {
-          target = document.getElementById('ca-after');
+          var nextCol = sk.closest('.ca-col').nextElementSibling;
+          if (nextCol) target = nextCol.querySelector('.ca-skip') || nextCol.querySelector('.slot-btn');
+          else { go(1, 'skip'); return; }
         }
         if (target) target.focus();
       });
